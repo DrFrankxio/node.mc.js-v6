@@ -2,7 +2,7 @@
 
 Uso:
 
-1.- Descargar el rar y descomprimirlo.
+1.- Descargar el zip y descomprimirlo.
 
 2.- Ejecutar `>npm install express` en la ruta del fichero `server.js`.
 
