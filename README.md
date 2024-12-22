@@ -8,4 +8,4 @@ Uso:
 
 3.- Ejecutar `>npm install socket.io`.
 
-4.- Ejecutar comando `node server.js` en el directorio del fichero `server.js`.
+4.- Ejecutar comando `>node server.js` en el directorio del fichero `server.js`.
