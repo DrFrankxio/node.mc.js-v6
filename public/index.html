@@ -1,0 +1,388 @@
+<head>
+<meta charset="UTF-8">
+  <title>RECONTRANOVA</title>
+<style>
+@font-face{
+	src:url("mc.woff");
+	font-family:mc;
+}
+body {
+	margin: 0;
+	font-family:mc;
+}
+#div1{
+	position:absolute;
+	right:0px;
+	top:0px;
+	margin: 0;
+	font-family:mc;
+	font-size:100px;
+}
+</style>
+</head>
+<body>
+<div id="div1"></div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js" integrity="sha512-8ExARjWWkIllMlNzVg7JKq9RKWPlJABQUNq6YvAjE/HobctjH/NA+bSiDMDvouBVjp4Wwnf1VP1OEv7Zgjtuxw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+<canvas id="container"></canvas>
+<script src="three.min.js"></script>
+<script src="perlin.js"></script>
+<script src="stats.js"></script>
+<script>
+// Conexión al servidor:
+socket=io();
+
+var stats = new Stats();
+stats.showPanel(0); // 0:fps, 1:ms, 2:mb, 3+:custom
+document.body.appendChild(stats.dom);
+
+function animate2(){
+		stats.begin();
+
+		// monitored code goes between this called functions
+
+		stats.end();
+
+		requestAnimationFrame(animate2);
+}
+
+requestAnimationFrame(animate2);
+
+let k=[]
+onkeydown=onkeyup=(e)=>{k[e.keyCode]=e.type=="keydown"}
+let scene = new THREE.Scene();
+
+let camera = new THREE.PerspectiveCamera(75, innerWidth / innerHeight, 0.1, 1000);
+camera.xs=0
+camera.ys=0
+camera.zs=0
+let renderer = new THREE.WebGLRenderer({
+	canvas: document.getElementById("container"),
+	antialias: true
+});
+renderer.setSize(window.innerWidth, window.innerHeight);
+
+// agregar luz
+const directionalLight = new THREE.DirectionalLight( 0xffffff, 1.5 );
+directionalLight.position.set( 0, 1, 0 ); //default; light shining from top
+directionalLight.castShadow = true; // default false
+scene.add( directionalLight );
+
+const light = new THREE.AmbientLight( 0x404040 , 1.5 ); // soft white light
+scene.add( light );
+
+// crear geometría y material
+let geometry = new THREE.BoxGeometry(1, 3, 1);
+loader=new THREE.TextureLoader();
+let bottomMaterial = new THREE.MeshLambertMaterial({ map: loader.load("bottom.jpg") });
+
+let sideMaterial = new THREE.MeshLambertMaterial({ map: loader.load("side.jpg") });
+
+let topMaterial = new THREE.MeshLambertMaterial({ map: loader.load("top.jpg") });
+
+var materialArray = [
+	sideMaterial,
+	sideMaterial,
+	topMaterial,
+	bottomMaterial,
+	sideMaterial,
+	sideMaterial,
+];
+
+materialArray[0].map.minFilter = THREE.NearestFilter
+materialArray[0].map.magFilter = THREE.NearestFilter
+materialArray[1].map.minFilter = THREE.NearestFilter
+materialArray[1].map.magFilter = THREE.NearestFilter
+materialArray[2].map.minFilter = THREE.NearestFilter
+materialArray[2].map.magFilter = THREE.NearestFilter
+materialArray[3].map.minFilter = THREE.NearestFilter
+materialArray[3].map.magFilter = THREE.NearestFilter
+materialArray[4].map.minFilter = THREE.NearestFilter
+materialArray[4].map.magFilter = THREE.NearestFilter
+materialArray[5].map.minFilter = THREE.NearestFilter
+materialArray[5].map.magFilter = THREE.NearestFilter
+
+let playerBottomMaterial = new THREE.MeshLambertMaterial({ map: loader.load("bottom_face.png") });
+
+let playerTopMaterial = new THREE.MeshLambertMaterial({ map: loader.load("top_face.png") });
+
+let playerLeftMaterial = new THREE.MeshLambertMaterial({ map: loader.load("left_face.png") });
+
+let playerRightMaterial = new THREE.MeshLambertMaterial({ map: loader.load("right_face.png") });
+
+let playerBackMaterial = new THREE.MeshLambertMaterial({ map: loader.load("back_face.png") });
+
+let playerFrontMaterial = new THREE.MeshLambertMaterial({ map: loader.load("front_face.png") });
+
+
+let playerMaterialArray = [
+	playerLeftMaterial,
+	playerRightMaterial,
+	playerTopMaterial,
+	playerBottomMaterial,
+	playerFrontMaterial,
+	playerBackMaterial,
+];
+
+playerMaterialArray[0].map.minFilter = THREE.NearestFilter
+playerMaterialArray[0].map.magFilter = THREE.NearestFilter
+playerMaterialArray[1].map.minFilter = THREE.NearestFilter
+playerMaterialArray[1].map.magFilter = THREE.NearestFilter
+playerMaterialArray[2].map.minFilter = THREE.NearestFilter
+playerMaterialArray[2].map.magFilter = THREE.NearestFilter
+playerMaterialArray[3].map.minFilter = THREE.NearestFilter
+playerMaterialArray[3].map.magFilter = THREE.NearestFilter
+playerMaterialArray[4].map.minFilter = THREE.NearestFilter
+playerMaterialArray[4].map.magFilter = THREE.NearestFilter
+playerMaterialArray[5].map.minFilter = THREE.NearestFilter
+playerMaterialArray[5].map.magFilter = THREE.NearestFilter
+
+// Calcular superficie:
+
+calcSurface=(x0,z0)=>{
+	x1=Math.floor(x0)
+	z1=Math.floor(z0)
+	return Math.floor(
+		Math.floor(noise.simplex2(x1/625,z1/625)*125-5)+
+		Math.floor(noise.simplex2(x1/125,z1/125)*25-5)+
+	 	Math.floor(noise.simplex2(x1/25,z1/25)*5-5)
+	)
+}
+
+// Distancia de avistamiento:
+
+renderDistance=250
+scene.background = new THREE.Color(0x0088ff);
+scene.fog = new THREE.Fog( 0x0088ff, 75, 150 );
+
+// crear InstancedMesh:
+let instances = [];
+camx=Math.floor(camera.position.x)
+camz=Math.floor(camera.position.z)
+for (let x = camx-renderDistance; x < camx+renderDistance; x++) {
+	for (let z = camz-renderDistance; z < camz+renderDistance; z++) {
+		instances.push(new THREE.Matrix4().makeTranslation(x,calcSurface(x,z),z));
+	}
+}
+let instancedMesh = new THREE.InstancedMesh(geometry, materialArray, instances.length);
+instancedMesh.setMatrixAt(0, instances[0]);
+for (let i = 1; i < instances.length; i++) {
+	instancedMesh.setMatrixAt(i, instances[i]);
+}
+scene.add(instancedMesh);
+
+
+update2=()=>{
+	// borrar residuos:
+	scene.remove(instancedMesh)
+	// crear InstancedMesh:
+	instances = [];
+	camx=Math.floor(camera.position.x)
+	camz=Math.floor(camera.position.z)
+	for (let x = camx-renderDistance; x < camx+renderDistance; x++) {
+		for (let z = camz-renderDistance; z < camz+renderDistance; z++) {
+			instances.push(new THREE.Matrix4().makeTranslation(x,calcSurface(x,z),z));
+		}
+	}
+	instancedMesh = new THREE.InstancedMesh(geometry, materialArray, instances.length);
+	instancedMesh.setMatrixAt(0, instances[0]);
+	for (let i = 1; i < instances.length; i++) {
+		instancedMesh.setMatrixAt(i, instances[i]);
+	}
+	scene.add(instancedMesh);
+	setTimeout(update2,2000)
+}
+
+update2()
+
+onmousedown=()=>{
+  if(document.pointerLockElement===document.body||
+  document.mozPointerLockElement===document.body){
+  }else{
+    document.body.requestPointerLock()
+  }
+}
+onmousemove=(event)=>{
+  if(document.pointerLockElement===document.body||
+  document.mozPointerLockElement===document.body){
+    xa-=0.01*event.movementX
+    if(-1.5<ya&&0<event.movementY){
+      ya-=0.01*event.movementY
+    }
+    if(ya<1.5&&event.movementY<0){
+      ya-=0.01*event.movementY
+    }
+  }
+}
+
+let ya=xa=0
+
+box2=new THREE.BoxGeometry(1,2,1)
+green_material=new THREE.MeshLambertMaterial({color: "rgb(0,255,0)" })
+
+socket.on('all', (e) => {
+	players=e.all
+});
+
+let playerObjects = {}; // Store player meshes
+let lastPositions = {}; // To store last positions of players
+
+// Function to animate limbs
+function animateLimbs(playerMesh, speed) {
+    // Assume arms and legs are part of the playerMesh group
+    let legL = playerMesh.children.find(child => child.position.x === -0.15);
+    let legR = playerMesh.children.find(child => child.position.x === 0.15);
+    let armL = playerMesh.children.find(child => child.position.x === -0.4);
+    let armR = playerMesh.children.find(child => child.position.x === 0.4);
+
+    if (speed > 0) { // If player is moving, animate limbs
+        // For walking animation (simple back and forth rotation)
+        let angle = Math.sin(Date.now() * 0.01) * 0.2; // Make a slow oscillation
+
+        // Animate legs
+        legL.rotation.x = angle;
+        legR.rotation.x = -angle;
+
+        // Animate arms
+        armL.rotation.z = angle;
+        armR.rotation.z = -angle;
+    } else {
+        // If the player stops, reset limbs to idle position
+        legL.rotation.x = 0;
+        legR.rotation.x = 0;
+        armL.rotation.z = 0;
+        armR.rotation.z = 0;
+    }
+}
+
+// Update when receiving positions of all players
+socket.on('all', (e) => {
+    players = e.all;
+
+    // Update or create player models
+    for (let id in players) {
+        let player = players[id];
+        
+        // If the player model doesn't exist yet, create it
+        if (!playerObjects[id]) {
+            let leg = new THREE.BoxGeometry(0.2, 1.0, 0.2);
+            let body = new THREE.BoxGeometry(0.7, 1.0, 0.2);
+            let head = new THREE.BoxGeometry(0.7, 0.7, 0.7);
+
+            let material = new THREE.MeshLambertMaterial({ color: 0x00ff00 }); // Green color
+            let legMaterial = new THREE.MeshLambertMaterial({ color: 0x0000ff }); // Blue color
+
+            let legL = new THREE.Mesh(leg, legMaterial);
+            legL.position.set(-0.15, -1.0, 0.0);
+            let legR = new THREE.Mesh(leg, legMaterial);
+            legR.position.set(0.15, -1.0, 0.0);
+
+            let armL = new THREE.Mesh(leg, material);
+            armL.position.set(-0.4, 0.0, 0.0);
+            let armR = new THREE.Mesh(leg, material);
+            armR.position.set(0.4, 0.0, 0.0);
+
+            let bodyP = new THREE.Mesh(body, material);
+            let headP = new THREE.Mesh(head, playerMaterialArray);
+            headP.position.set(0.0, 1.0, 0.0);
+            let playerMesh = new THREE.Group();
+
+            playerMesh.add(legR);
+            playerMesh.add(legL);
+            playerMesh.add(armR);
+            playerMesh.add(armL);
+            playerMesh.add(headP);
+            playerMesh.add(bodyP);
+
+            scene.add(playerMesh);
+            playerObjects[id] = playerMesh;
+
+            // Initialize last position for detecting movement
+            lastPositions[id] = { x: player.x, z: player.z };
+        }
+
+        // Update the player model's position
+        let playerMesh = playerObjects[id];
+        playerMesh.position.set(player.x, calcSurface(player.x, player.z) + 4, player.z); // Adjust Y with the surface
+        playerMesh.lookAt(
+            player.x + Math.sin(player.xa),
+            calcSurface(player.x, player.z) + 4,
+            player.z + Math.cos(player.xa)
+        );
+
+        // Calculate speed based on position difference
+        let lastPos = lastPositions[id];
+        let speed = Math.sqrt(Math.pow(player.x - lastPos.x, 2) + Math.pow(player.z - lastPos.z, 2));
+
+        // Animate the limbs based on movement speed
+        animateLimbs(playerMesh, speed);
+
+        // Update the last position
+        lastPositions[id] = { x: player.x, z: player.z };
+    }
+});
+
+// Update the player's position (for the player controlled by this client)
+socket.on('pack', (e) => {
+    camera.position.x = e.x;
+    camera.position.z = e.z;
+});
+
+update=()=>{
+	requestAnimationFrame(update)
+	socket.emit('angle',{x:xa,y:ya})
+	if(k[13]){
+		//socket.emit('p2p',{content:msgInput.value});
+	}
+  //This update the player.
+  if(-1.5>ya){ya=-1.5}
+  if(1.5<ya){ya=1.5}
+  //camera.position.x+=camera.xs
+  //camera.position.y+=camera.ys
+  //camera.position.z+=camera.zs
+  //camera.xs*=7/8
+  //camera.ys*=7/8
+  //camera.zs*=7/8
+  camera.position.y=calcSurface(camera.position.x,camera.position.z)+5
+  camera.lookAt(
+    camera.position.x+Math.sin(xa)*Math.cos(ya),
+    camera.position.y+Math.sin(ya),
+    camera.position.z+Math.cos(xa)*Math.cos(ya)
+  )
+  if(k[65]){
+    socket.emit('move',{key:65})
+  }
+  if(k[87]){
+    socket.emit('move',{key:87})
+  }
+  if(k[68]){
+    socket.emit('move',{key:68})
+  }
+  if(k[83]){
+    socket.emit('move',{key:83})
+  }
+  if(k[81]){
+    socket.emit('move',{key:81})
+  }
+  if(k[88]){
+    //camera.ys-=0.005
+  }
+}
+
+update()
+
+// Resize Window
+window.addEventListener("resize", function(){
+	renderer.setSize(window.innerWidth, window.innerHeight);
+	camera.aspect = window.innerWidth / window.innerHeight;
+	camera.updateProjectionMatrix();
+});
+
+// renderizar
+function animate() {
+	requestAnimationFrame(animate);
+	renderer.render(scene, camera);
+}
+animate();
+</script>
+</body>
+</html>
