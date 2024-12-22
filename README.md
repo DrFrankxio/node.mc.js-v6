@@ -2,10 +2,10 @@
 
 Uso:
 
-Descargar el rar y descomprimirlo.
+1.- Descargar el rar y descomprimirlo.
 
-Ejecutar `>npm install express`.
+2.- Ejecutar `>npm install express`.
 
-Ejecutar `>npm install socket.io`.
+3.- Ejecutar `>npm install socket.io`.
 
-Ejecutar comando `node server.js` en el directorio del fichero `server.js`.
+4.- Ejecutar comando `node server.js` en el directorio del fichero `server.js`.
